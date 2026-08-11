@@ -272,49 +272,86 @@ class Application {
         document.getElementById('batch-delete-grade-select')?.addEventListener('change', () => this.updateBatchDeleteCountPreview());
         document.getElementById('batch-delete-room-select')?.addEventListener('change', () => this.updateBatchDeleteCountPreview());
 
-        document.getElementById('form-batch-delete-students')?.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const grade = document.getElementById('batch-delete-grade-select').value;
-            const room = document.getElementById('batch-delete-room-select').value;
+        const handleBatchDeleteSubmit = async (e) => {
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+            await this.submitBatchDelete(e);
+        };
+        document.getElementById('form-batch-delete-students')?.addEventListener('submit', handleBatchDeleteSubmit);
+    }
 
-            const students = firebaseService.getStudents();
-            const matching = students.filter(s => {
-                const matchGrade = (grade === 'ALL' || !grade) ? true : (s.grade === grade);
-                const matchRoom = (room === 'ALL' || !room) ? true : (String(s.room) === String(room));
-                return matchGrade && matchRoom;
-            });
+    async submitBatchDelete(e) {
+        if (e) { e.preventDefault(); e.stopPropagation(); }
 
-            if (matching.length === 0) {
-                await this.alertDialog({
-                    title: 'ไม่พบข้อมูลนักเรียน',
-                    message: 'ไม่พบรายชื่อนักเรียนตรงตามระดับชั้นและห้องที่เลือก',
-                    type: 'warning'
-                });
-                return;
-            }
+        const gradeSelect = document.getElementById('batch-delete-grade-select');
+        const roomSelect  = document.getElementById('batch-delete-room-select');
+        const grade = gradeSelect ? gradeSelect.value : 'ALL';
+        const room  = roomSelect  ? roomSelect.value  : 'ALL';
 
-            const gradeText = grade === 'ALL' ? 'ทุกระดับชั้น' : grade;
-            const roomText = room === 'ALL' ? 'ทุกห้อง' : `ห้อง ${room}`;
+        const students = firebaseService.getStudents();
+        const normTargetGrade = (!grade || grade === 'ALL') ? 'ALL' : String(grade).trim().replace(/["']/g, '');
 
-            const confirmed = await this.confirmDialog({
-                title: 'ยืนยันลบข้อมูลนักเรียนยกชุด',
-                message: `คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนักเรียนกลุ่ม (${gradeText} ${roomText}) จำนวนรวมทั้งหมด ${matching.length} ราย ออกจากระบบ?`,
-                type: 'danger',
-                confirmText: 'ลบข้อมูลกลุ่มนี้'
-            });
+        const matching = students.filter(s => {
+            let sGradeNorm = String(s.grade || '').trim().replace(/["']/g, '');
+            if (sGradeNorm.includes('ม.1')) sGradeNorm = 'ม.1';
+            else if (sGradeNorm.includes('ม.2')) sGradeNorm = 'ม.2';
+            else if (sGradeNorm.includes('ม.3')) sGradeNorm = 'ม.3';
+            else if (sGradeNorm.includes('ม.4')) sGradeNorm = 'ม.4';
+            else if (sGradeNorm.includes('ม.5')) sGradeNorm = 'ม.5';
+            else if (sGradeNorm.includes('ม.6')) sGradeNorm = 'ม.6';
+            else if (sGradeNorm.includes('ปวช.1')) sGradeNorm = 'ปวช.1';
+            else if (sGradeNorm.includes('ปวช.2')) sGradeNorm = 'ปวช.2';
+            else if (sGradeNorm.includes('ปวช.3')) sGradeNorm = 'ปวช.3';
 
-            if (confirmed) {
-                const deletedCount = await firebaseService.deleteStudentsBatch(grade, room);
-                this.closeModal('modal-batch-delete-students');
-                this.renderStudentList();
-                this.renderDashboard();
-                await this.alertDialog({
-                    title: 'ลบข้อมูลสำเร็จ',
-                    message: `ระบบได้ทำการลบข้อมูลนักเรียนกลุ่ม ${gradeText} ${roomText} จำนวน ${deletedCount} ราย ออกจากระบบเรียบร้อยแล้ว`,
-                    type: 'success'
-                });
-            }
+            const matchGrade = (normTargetGrade === 'ALL') ? true : (sGradeNorm.includes(normTargetGrade) || normTargetGrade.includes(sGradeNorm));
+            const matchRoom = (!room || room === 'ALL') ? true : (String(s.room).trim() === String(room).trim());
+            return matchGrade && matchRoom;
         });
+
+        if (matching.length === 0) {
+            await this.alertDialog({
+                title: 'ไม่พบข้อมูลนักเรียน',
+                message: 'ไม่พบรายชื่อนักเรียนตรงตามระดับชั้นและห้องที่เลือก',
+                type: 'warning'
+            });
+            return;
+        }
+
+        const gradeText = grade === 'ALL' ? 'ทุกระดับชั้น' : grade;
+        const roomText  = room  === 'ALL' ? 'ทุกห้อง' : `ห้อง ${room}`;
+
+        const confirmed = await this.confirmDialog({
+            title: 'ยืนยันลบข้อมูลนักเรียนยกชุด',
+            message: `คุณแน่ใจหรือไม่ว่าต้องการลบข้อมูลนักเรียนกลุ่ม (${gradeText} ${roomText}) จำนวนรวมทั้งหมด ${matching.length} ราย ออกจากระบบ?`,
+            type: 'danger',
+            confirmText: 'ลบข้อมูลกลุ่มนี้'
+        });
+
+        if (confirmed) {
+            const deletedCount = await firebaseService.deleteStudentsBatch(grade, room);
+            this.closeModal('modal-batch-delete-students');
+
+            // Reset filters to show fresh state
+            const gradeFilter = document.getElementById('student-grade-filter');
+            const roomFilter  = document.getElementById('student-room-filter');
+            if (gradeFilter) gradeFilter.value = '';
+            if (roomFilter)  roomFilter.value  = '';
+
+            this.renderRoomPills();
+            this.updateRoomFilterDropdown();
+            this.renderStudentList();
+            this.renderDashboard();
+
+            await this.alertDialog({
+                title: '✅ ลบข้อมูลสำเร็จ',
+                message: `ระบบได้ทำการลบข้อมูลนักเรียนกลุ่ม ${gradeText} ${roomText} จำนวน ${deletedCount} ราย ออกจากระบบเรียบร้อยแล้ว`,
+                type: 'success'
+            });
+
+            this.renderRoomPills();
+            this.updateRoomFilterDropdown();
+            this.renderStudentList();
+        }
+    }
 
         // Teacher Modal & Actions
         document.getElementById('btn-add-teacher')?.addEventListener('click', () => {

@@ -381,6 +381,7 @@ class FirebaseService {
             await this.cloudPut(CONFIG.FIREBASE.ENDPOINTS.STUDENTS, cloudObject);
         }
 
+        this._memoryCache[CONFIG.STORAGE_KEYS.STUDENTS] = students;
         this.setCache(CONFIG.STORAGE_KEYS.STUDENTS, students);
         this._lastSaveTime = Date.now();
         window.dispatchEvent(new CustomEvent('studentsUpdated', { detail: students }));

@@ -1219,6 +1219,7 @@ h1, h2, h3, h4, h5, h6 {
 }
 
 #login-screen-view.hidden {
+    display: none !important;
     opacity: 0;
     visibility: hidden;
     pointer-events: none;

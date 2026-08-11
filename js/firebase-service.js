@@ -48,22 +48,23 @@ class FirebaseService {
 
     // --- Helper: LocalStorage & In-Memory Fast Cache (0ms) ---
     getCache(key) {
-        if (this._memoryCache[key] && Array.isArray(this._memoryCache[key]) && this._memoryCache[key].length > 0) {
+        // Check memory cache first - accept empty arrays as valid (deletion stays deleted)
+        if (this._memoryCache[key] !== undefined && Array.isArray(this._memoryCache[key])) {
             return this._memoryCache[key];
         }
         try {
             const data = localStorage.getItem(key);
-            if (data) {
+            if (data !== null) {
                 const parsed = JSON.parse(data);
-                if (Array.isArray(parsed) && parsed.length > 0) {
+                if (Array.isArray(parsed)) {
                     this._memoryCache[key] = parsed;
+                    return parsed;
                 }
-                return parsed;
             }
         } catch (e) {
             console.error(`[FirebaseService] Error reading cache ${key}:`, e);
         }
-        return this._memoryCache[key] || [];
+        return [];
     }
 
     setCache(key, data) {

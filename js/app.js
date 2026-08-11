@@ -51,8 +51,8 @@ class Application {
         // 3. Setup Global Event Listeners & Modals
         this.setupEventListeners();
 
-        // 4. Check Auth Status & Apply Permissions
-        authManager.applyUIPermissions();
+        // 4. Initialize Auth State from saved session (MUST be after DOM ready)
+        authManager.initAuthState();
 
         // 5. Render Initial Dashboard Views & Charts
         this.startLiveClock();
@@ -107,7 +107,7 @@ class Application {
         this.updateStudentDropdowns();
     }
 
-    // --- Seed Data Loader (Disabled Sample Data Auto-Loader) ---
+    // --- Seed Data Loaders ---
     checkAndLoadSeedData() {
         // Disabled sample student seed data as requested
     }
@@ -115,6 +115,43 @@ class Application {
     checkAndLoadTeacherSeedData() {
         // Disabled sample teacher seed data as requested
     }
+
+    /**
+     * Load default admin/user accounts on first launch
+     * Creates jaturon (admin) and admin (admin) if no users exist
+     */
+    checkAndLoadUserSeedData() {
+        try {
+            const existingUsers = firebaseService.getUsers();
+            if (existingUsers && existingUsers.length > 0) {
+                return; // Already have users
+            }
+            // Seed default accounts for first-time setup
+            const defaultUsers = [
+                {
+                    id: 'USR_ADMIN_001',
+                    username: 'jaturon',
+                    fullName: 'นายจตุรงค์ พิศวงษ์',
+                    role: 'admin',
+                    password: '1234',
+                    status: 'active'
+                },
+                {
+                    id: 'USR_ADMIN_002',
+                    username: 'admin',
+                    fullName: 'ผู้ดูแลระบบ (Admin)',
+                    role: 'admin',
+                    password: 'admin123',
+                    status: 'active'
+                }
+            ];
+            firebaseService.setCache(CONFIG.STORAGE_KEYS.USERS, defaultUsers);
+            console.log('[App] Default user accounts seeded:', defaultUsers.length, 'users');
+        } catch (e) {
+            console.error('[App] Error seeding user data:', e);
+        }
+    }
+
 
     // --- Navigation Router ---
     setupNavigation() {

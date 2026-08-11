@@ -24,8 +24,8 @@
     <link rel="stylesheet" href="css/style.css?v=6.0">
 </head>
 <body>
-    <!-- DEDICATED FULLSCREEN LOGIN PAGE (Matching User Reference Image Design) -->
-    <div id="login-screen-view" class="hidden">
+    <!-- DEDICATED FULLSCREEN LOGIN PAGE - Visible by default, hidden after login -->
+    <div id="login-screen-view" style="display:flex;">
         <div class="login-card">
             <!-- Left Branding & Feature Highlights Side -->
             <div class="login-left-banner">
@@ -130,7 +130,7 @@
             </ul>
 
             <div style="padding: 18px 14px; font-size: 1rem; color: #ffffff; font-weight: 600; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.2); letter-spacing: 0.3px; text-shadow: 0 1px 4px rgba(0,0,0,0.3);">
-                &copy; 2026 PR-Care+ Developed by Krunoii v8.5
+                &copy; 2026 PR-Care+ Developed by Krunoii v8.6
             </div>
         </aside>
 
@@ -145,7 +145,7 @@
                         <span class="status-text">Online (Firebase Sync)</span>
                     </div>
                     <div style="padding: 4px 10px; border-radius: 12px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fde68a; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 4px;" title="เวอร์ชันปัจจุบันของระบบ">
-                        <i class="ri-git-commit-line"></i> v8.5
+                        <i class="ri-git-commit-line"></i> v8.6
                     </div>
                 </div>
 
@@ -1099,14 +1099,6 @@
         </div>
     </div>
 
-    <!-- Load Application Scripts (v5.0) -->
-    <script src="js/config.js?v=5.0"></script>
-    <script src="js/firebase-service.js?v=5.0"></script>
-    <script src="js/cloudinary-service.js?v=5.0"></script>
-    <script src="js/pdf-generator.js?v=5.0"></script>
-    <script src="js/csv-importer.js?v=5.0"></script>
-    <script src="js/auth.js?v=5.0"></script>
-    <script src="js/app.js?v=5.0"></script>
 
     <!-- Modal: Add/Edit Teacher -->
     <div class="modal-overlay" id="modal-teacher">
@@ -1310,47 +1302,101 @@
                 </button>
             </div>
         </div>
-    <!-- Core Application Scripts -->
-    <script src="js/config.js?v=8.5"></script>
-    <script src="js/firebase-service.js?v=8.5"></script>
-    <script src="js/auth.js?v=8.5"></script>
-    <script src="js/csv-importer.js?v=8.5"></script>
-    <script src="js/cloudinary-service.js?v=8.5"></script>
-    <script src="js/pdf-generator.js?v=8.5"></script>
-    <script src="js/app.js?v=8.5"></script>
+    </div>
+    <!-- Core Application Scripts v8.5 (Single Load - No Duplicates) -->
+    <script src="js/config.js?v=8.6"></script>
+    <script src="js/firebase-service.js?v=8.6"></script>
+    <script src="js/auth.js?v=8.6"></script>
+    <script src="js/csv-importer.js?v=8.6"></script>
+    <script src="js/cloudinary-service.js?v=8.6"></script>
+    <script src="js/pdf-generator.js?v=8.6"></script>
+    <script src="js/app.js?v=8.6"></script>
 
     <script>
         async function appLoginDirect(e) {
-            if (e) {
-                e.preventDefault();
-                e.stopPropagation();
-            }
-            const roleSelect = document.getElementById('page-login-role-select') || document.getElementById('page-login-role');
+            if (e) { e.preventDefault(); e.stopPropagation(); }
+
+            const roleSelect = document.getElementById('page-login-role-select');
             const userInput  = document.getElementById('page-login-user');
             const passInput  = document.getElementById('page-login-pass');
+            const loginBtn   = document.querySelector('.btn-signin-submit');
 
-            const role = roleSelect ? roleSelect.value : 'admin';
-            const username = userInput ? userInput.value.trim() : '';
-            const password = passInput ? passInput.value.trim() : '';
+            const role     = roleSelect ? roleSelect.value : 'admin';
+            const username = userInput  ? userInput.value.trim()  : '';
+            const password = passInput  ? passInput.value.trim()  : '';
 
-            if (window.authManager) {
-                await window.authManager.login(role, username, password);
-                window.authManager.applyUIPermissions();
+            if (!username) {
+                if (userInput) {
+                    userInput.focus();
+                    userInput.style.borderColor = '#e11d48';
+                    setTimeout(() => { userInput.style.borderColor = ''; }, 2000);
+                }
+                return false;
+            }
+            if (!password) {
+                if (passInput) {
+                    passInput.focus();
+                    passInput.style.borderColor = '#e11d48';
+                    setTimeout(() => { passInput.style.borderColor = ''; }, 2000);
+                }
+                return false;
             }
 
-            const loginScreen = document.getElementById('login-screen-view');
-            if (loginScreen) {
-                loginScreen.classList.add('hidden');
-                loginScreen.style.display = 'none';
-                loginScreen.style.opacity = '0';
-                loginScreen.style.visibility = 'hidden';
-                loginScreen.style.pointerEvents = 'none';
+            // Show loading state
+            if (loginBtn) { loginBtn.disabled = true; loginBtn.innerHTML = '<i class="ri-loader-4-line"></i> กำลังเข้าสู่ระบบ...'; }
+
+            let success = false;
+            try {
+                if (window.authManager) {
+                    success = await window.authManager.login(role, username, password);
+                }
+            } catch (err) {
+                console.error('[Login] Error during login:', err);
+            }
+
+            // Restore button
+            if (loginBtn) { loginBtn.disabled = false; loginBtn.innerHTML = '<i class="ri-key-2-line"></i> เข้าสู่ระบบ (Sign In)'; }
+
+            if (success) {
+                // Hide login screen
+                const loginScreen = document.getElementById('login-screen-view');
+                if (loginScreen) {
+                    loginScreen.style.display = 'none';
+                    loginScreen.style.opacity = '0';
+                    loginScreen.style.visibility = 'hidden';
+                    loginScreen.style.pointerEvents = 'none';
+                    loginScreen.classList.add('hidden');
+                }
+                // Render dashboard after login
+                if (window.app && typeof window.app.renderDashboard === 'function') {
+                    window.app.renderDashboard();
+                    window.app.renderStudentList();
+                    window.app.renderTeacherList();
+                }
+            } else {
+                // Show error
+                const loginCard = document.querySelector('.login-right-form');
+                let errorEl = document.getElementById('login-error-msg');
+                if (!errorEl && loginCard) {
+                    errorEl = document.createElement('div');
+                    errorEl.id = 'login-error-msg';
+                    errorEl.style.cssText = 'background:#fee2e2;color:#991b1b;border:1px solid #fecaca;border-radius:10px;padding:10px 14px;font-size:0.9rem;margin-top:10px;display:flex;align-items:center;gap:8px;';
+                    errorEl.innerHTML = '<i class="ri-error-warning-line"></i> <span>ชื่อผู้ใช้หรือรหัสผ่านไม่ถูกต้อง กรุณาตรวจสอบอีกครั้ง</span>';
+                    const form = document.getElementById('form-page-login');
+                    if (form) form.appendChild(errorEl);
+                }
+                if (errorEl) {
+                    errorEl.style.display = 'flex';
+                    setTimeout(() => { if (errorEl) errorEl.style.display = 'none'; }, 4000);
+                }
+                if (passInput) { passInput.value = ''; passInput.focus(); }
             }
             return false;
         }
 
-        // Global Navigation & Logout Event Delegator Fallback
+        // Global Navigation & Logout Event Delegator
         document.addEventListener('click', function(e) {
+            // Sidebar navigation
             const link = e.target.closest('#sidebar .nav-item a');
             if (link) {
                 e.preventDefault();
@@ -1366,10 +1412,24 @@
                 }
             }
 
+            // Logout button
             const logoutBtn = e.target.closest('#btn-logout');
             if (logoutBtn) {
                 e.preventDefault();
-                if (window.authManager) {
+                e.stopPropagation();
+                if (window.app && typeof window.app.confirmDialog === 'function') {
+                    window.app.confirmDialog({
+                        title: 'ยืนยันการออกจากระบบ',
+                        message: 'คุณต้องการออกจากระบบดูแลช่วยเหลือนักเรียนใช่หรือไม่?',
+                        type: 'warning',
+                        confirmText: 'ออกจากระบบ',
+                        cancelText: 'ยกเลิก'
+                    }).then(confirmed => {
+                        if (confirmed && window.authManager) {
+                            window.authManager.logout();
+                        }
+                    });
+                } else if (window.authManager) {
                     window.authManager.logout();
                 } else {
                     localStorage.removeItem('prcare_auth_user');

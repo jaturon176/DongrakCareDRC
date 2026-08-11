@@ -1310,7 +1310,15 @@
                 </button>
             </div>
         </div>
-    </div>
+    <!-- Core Application Scripts -->
+    <script src="js/config.js?v=8.3"></script>
+    <script src="js/firebase-service.js?v=8.3"></script>
+    <script src="js/auth.js?v=8.3"></script>
+    <script src="js/csv-importer.js?v=8.3"></script>
+    <script src="js/cloudinary-service.js?v=8.3"></script>
+    <script src="js/pdf-generator.js?v=8.3"></script>
+    <script src="js/app.js?v=8.3"></script>
+
     <script>
         async function appLoginDirect(e) {
             if (e) {
@@ -1327,6 +1335,7 @@
 
             if (window.authManager) {
                 await window.authManager.login(role, username, password);
+                window.authManager.applyUIPermissions();
             }
 
             const loginScreen = document.getElementById('login-screen-view');

@@ -56,7 +56,7 @@ class AuthManager {
                 roleTitle: CONFIG.ROLE_NAMES_TH[matchedUser.role] || matchedUser.role,
                 avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${matchedUser.role}_${matchedUser.username}`
             };
-        } else if (role === CONFIG.ROLES.STUDENT) {
+        } else if (role === CONFIG.ROLES.STUDENT || role === 'student') {
             const students = firebaseService.getStudents();
             const studentMatch = students.find(s => s.studentId === username || s.fullName.includes(username));
             
@@ -70,21 +70,22 @@ class AuthManager {
                 roleTitle: CONFIG.ROLE_NAMES_TH.student,
                 avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=student'
             };
-        } else if (role === CONFIG.ROLES.TEACHER) {
-            userProfile = {
-                id: 'TCH_01',
-                name: username || 'ครูผู้สอน / ครูกิจการนักเรียน',
-                role: CONFIG.ROLES.TEACHER,
-                roleTitle: CONFIG.ROLE_NAMES_TH.teacher,
-                avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=teacher'
-            };
-        } else if (role === CONFIG.ROLES.ADMIN) {
+        } else if (role === CONFIG.ROLES.ADMIN || role === 'admin') {
             userProfile = {
                 id: 'ADM_01',
                 name: username || 'ผู้ดูแลระบบ (Admin)',
                 role: CONFIG.ROLES.ADMIN,
                 roleTitle: CONFIG.ROLE_NAMES_TH.admin,
                 avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=admin'
+            };
+        } else {
+            // Default: Teacher / Head of Student Affairs
+            userProfile = {
+                id: 'TCH_01',
+                name: username || 'ครูประจำชั้น / ครูกิจการนักเรียน',
+                role: CONFIG.ROLES.TEACHER,
+                roleTitle: CONFIG.ROLE_NAMES_TH.teacher,
+                avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=teacher'
             };
         }
 

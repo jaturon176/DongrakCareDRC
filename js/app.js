@@ -202,19 +202,30 @@ class Application {
             }
         });
 
-        // Form Standalone Login Submit
-        document.getElementById('standalone-login-form')?.addEventListener('submit', async (e) => {
+        // Form Standalone Login Submit (Matching index.html IDs)
+        const handleLoginSubmit = async (e) => {
             e.preventDefault();
-            const role = document.getElementById('page-login-role').value;
-            const username = document.getElementById('page-login-user').value;
-            const password = document.getElementById('page-login-pass').value;
+            const roleSelect = document.getElementById('page-login-role-select') || document.getElementById('page-login-role');
+            const userInput  = document.getElementById('page-login-user');
+            const passInput  = document.getElementById('page-login-pass');
+
+            const role = roleSelect ? roleSelect.value : 'teacher';
+            const username = userInput ? userInput.value.trim() : '';
+            const password = passInput ? passInput.value.trim() : '';
 
             const success = await authManager.login(role, username, password);
             if (success) {
-                document.getElementById('login-screen-view')?.classList.add('hidden');
+                const loginScreen = document.getElementById('login-screen-view');
+                if (loginScreen) {
+                    loginScreen.classList.add('hidden');
+                    loginScreen.style.display = 'none';
+                }
                 console.log(`[App] Logged in successfully as ${role}`);
             }
-        });
+        };
+
+        document.getElementById('form-page-login')?.addEventListener('submit', handleLoginSubmit);
+        document.getElementById('standalone-login-form')?.addEventListener('submit', handleLoginSubmit);
 
         // Modal Login Submit (Fallback)
         document.getElementById('form-login')?.addEventListener('submit', async (e) => {

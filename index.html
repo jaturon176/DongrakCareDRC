@@ -1329,7 +1329,7 @@
             const userInput  = document.getElementById('page-login-user');
             const passInput  = document.getElementById('page-login-pass');
 
-            const role = roleSelect ? roleSelect.value : 'teacher';
+            const role = roleSelect ? roleSelect.value : 'admin';
             const username = userInput ? userInput.value.trim() : '';
             const password = passInput ? passInput.value.trim() : '';
 
@@ -1348,6 +1348,37 @@
             }
             return false;
         }
+
+        // Global Navigation & Logout Event Delegator Fallback
+        document.addEventListener('click', function(e) {
+            const link = e.target.closest('#sidebar .nav-item a');
+            if (link) {
+                e.preventDefault();
+                const pageId = link.getAttribute('data-page');
+                if (pageId && window.app) {
+                    window.app.switchPage(pageId);
+                } else if (pageId) {
+                    document.querySelectorAll('#sidebar .nav-item').forEach(item => item.classList.remove('active'));
+                    link.parentElement.classList.add('active');
+                    document.querySelectorAll('.content-page').forEach(page => page.classList.remove('active'));
+                    const targetPageEl = document.getElementById('page-' + pageId);
+                    if (targetPageEl) targetPageEl.classList.add('active');
+                }
+            }
+
+            const logoutBtn = e.target.closest('#btn-logout');
+            if (logoutBtn) {
+                e.preventDefault();
+                if (window.authManager) {
+                    window.authManager.logout();
+                } else {
+                    localStorage.removeItem('prcare_auth_user');
+                    sessionStorage.removeItem('prcare_auth_user');
+                    localStorage.setItem('prcare_user_logged_out', 'true');
+                    location.reload();
+                }
+            }
+        });
     </script>
 </body>
 </html>

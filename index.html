@@ -130,7 +130,7 @@
             </ul>
 
             <div style="padding: 18px 14px; font-size: 1rem; color: #ffffff; font-weight: 600; text-align: center; border-top: 1px solid rgba(255, 255, 255, 0.2); letter-spacing: 0.3px; text-shadow: 0 1px 4px rgba(0,0,0,0.3);">
-                &copy; 2026 PR-Care+ Developed by Krunoii v8.2
+                &copy; 2026 PR-Care+ Developed by Krunoii v8.3
             </div>
         </aside>
 
@@ -145,7 +145,7 @@
                         <span class="status-text">Online (Firebase Sync)</span>
                     </div>
                     <div style="padding: 4px 10px; border-radius: 12px; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.25); color: #fde68a; font-size: 0.8rem; font-weight: 700; display: flex; align-items: center; gap: 4px;" title="เวอร์ชันปัจจุบันของระบบ">
-                        <i class="ri-git-commit-line"></i> v8.2
+                        <i class="ri-git-commit-line"></i> v8.3
                     </div>
                 </div>
 
@@ -1275,7 +1275,7 @@
                 </div>
                 <div class="modal-footer">
                     <button type="button" class="btn btn-secondary" onclick="app.closeModal('modal-batch-delete-students')">ยกเลิก</button>
-                    <button type="submit" class="btn btn-danger" id="btn-confirm-batch-delete"><i class="ri-delete-bin-line"></i> ยืนยันลบข้อมูลกลุ่มนี้</button>
+                    <button type="button" class="btn btn-danger" id="btn-confirm-batch-delete" onclick="app.submitBatchDelete(event)"><i class="ri-delete-bin-line"></i> ยืนยันลบข้อมูลกลุ่มนี้</button>
                 </div>
             </form>
         </div>

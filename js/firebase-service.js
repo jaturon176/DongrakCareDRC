@@ -156,13 +156,12 @@ class FirebaseService {
                 itemsList = cloudData.filter(x => x !== null);
             }
 
-            if (itemsList.length > 0) {
-                this.setCache(key, itemsList);
-                if (eventName) {
-                    window.dispatchEvent(new CustomEvent(eventName, { detail: itemsList }));
-                }
-                return itemsList;
+            // Always cache - even empty arrays (deletion stays deleted)
+            this.setCache(key, itemsList);
+            if (eventName) {
+                window.dispatchEvent(new CustomEvent(eventName, { detail: itemsList }));
             }
+            return itemsList;
         }
         return this.getCache(key) || [];
     }

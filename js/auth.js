@@ -1,33 +1,37 @@
 /**
- * ระบบดูแลช่วยเหลือนักเรียน - Authentication & Role Manager v8.6
- * Controls access for 3 User Roles: Student / Teacher / Administrator
+ * ระบบดูแลช่วยเหลือนักเรียน - Authentication & Role Manager v8.7
  * 
- * FIX v8.6:
- *  - applyUIPermissions() now ALWAYS shows/hides #login-screen-view correctly
- *  - loadSavedSession() properly restores session without race conditions
- *  - logout() forces page reload to ensure clean state
+ * FIX v8.7 (CRITICAL):
+ *  - login() now fetches users from Firebase FIRST before matching credentials
+ *  - Added permanent hardcoded emergency admin credentials as last resort
+ *  - initAuthState() properly restores session after DOM ready
+ *  - logout() immediately shows login screen
+ *  - applyUIPermissions() handles display:none correctly
  */
 
 class AuthManager {
     constructor() {
-        this.currentUser = null; // Start null, load session after DOM ready
+        this.currentUser = null; // Always start null, restore after DOM ready
+        // Hardcoded emergency admin accounts - ALWAYS work regardless of Firebase/cache state
+        this._emergencyAccounts = [
+            { id: 'EMG_ADM_01', username: 'jaturon',  password: '1234',      fullName: 'นายจตุรงค์ พิศวงษ์',      role: 'admin' },
+            { id: 'EMG_ADM_02', username: 'admin',    password: 'admin123',  fullName: 'ผู้ดูแลระบบ (Admin)',     role: 'admin' },
+            { id: 'EMG_TCH_01', username: 'teacher1', password: 'teacher123',fullName: 'ครูผู้สอน',               role: 'teacher' }
+        ];
     }
 
     /**
-     * Load current session from LocalStorage / SessionStorage
-     * Returns null if user explicitly logged out
+     * Load current session from storage
      */
     loadSavedSession() {
         try {
             const isExplicitLogout = localStorage.getItem('prcare_user_logged_out') === 'true';
-            if (isExplicitLogout) {
-                return null;
-            }
+            if (isExplicitLogout) return null;
+
             const saved = sessionStorage.getItem(CONFIG.STORAGE_KEYS.AUTH_USER)
                 || localStorage.getItem(CONFIG.STORAGE_KEYS.AUTH_USER);
             if (saved) {
                 const parsed = JSON.parse(saved);
-                // Validate parsed object has required fields
                 if (parsed && parsed.role && parsed.name) {
                     return parsed;
                 }
@@ -40,33 +44,53 @@ class AuthManager {
 
     /**
      * Initialize auth state - call AFTER DOM is ready
-     * Shows login screen or hides it based on saved session
      */
     initAuthState() {
         this.currentUser = this.loadSavedSession();
         this.applyUIPermissions();
-        console.log('[AuthManager] Auth state initialized. User:', this.currentUser ? this.currentUser.name : 'Not logged in');
+        console.log('[AuthManager] Auth initialized. User:', this.currentUser ? this.currentUser.name : 'Not logged in');
     }
 
     /**
-     * Authenticate User with Role
-     * @param {string} role 'student' | 'teacher' | 'admin'
-     * @param {string} username 
-     * @param {string} password 
+     * Authenticate User
+     * Priority: 1) Firebase/Cache users  2) Emergency hardcoded accounts
      */
     async login(role, username, password) {
-        if (!username || !username.trim()) {
-            console.warn('[AuthManager] Login attempted with empty username');
-            return false;
-        }
+        if (!username || !username.trim()) return false;
+        if (!password || !password.trim()) return false;
+
+        const uname = username.trim().toLowerCase();
+        const upass = password.trim();
+
+        console.log('[AuthManager] Login attempt:', uname, '| Role:', role);
 
         let userProfile = null;
-        const users = firebaseService.getUsers();
 
-        // 1. Search in Registered Users Manager Database (exact match)
+        // === STEP 1: Try to fetch fresh users from Firebase ===
+        let users = [];
+        try {
+            if (firebaseService.isOnline) {
+                // Fetch directly from Firebase (bypass cache timing issues)
+                const freshUsers = await firebaseService.fetchUsersFromCloud();
+                if (freshUsers && freshUsers.length > 0) {
+                    users = freshUsers;
+                    console.log('[AuthManager] Got', users.length, 'users from Firebase');
+                }
+            }
+        } catch (e) {
+            console.warn('[AuthManager] Firebase fetch failed, using cache:', e.message);
+        }
+
+        // Fallback to cache if Firebase fetch failed or offline
+        if (users.length === 0) {
+            users = firebaseService.getUsers() || [];
+            console.log('[AuthManager] Using cached users:', users.length);
+        }
+
+        // === STEP 2: Search in users list (Firebase/Cache) ===
         const matchedUser = users.find(u =>
-            u.username && u.username.toLowerCase() === username.toLowerCase() &&
-            u.password === password
+            u.username && u.username.toLowerCase() === uname &&
+            u.password === upass
         );
 
         if (matchedUser) {
@@ -78,8 +102,29 @@ class AuthManager {
                 roleTitle: CONFIG.ROLE_NAMES_TH[matchedUser.role] || matchedUser.role,
                 avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${matchedUser.role}_${matchedUser.username}`
             };
-        } else if (role === CONFIG.ROLES.STUDENT || role === 'student') {
-            // Student lookup by studentId or name
+            console.log('[AuthManager] Matched in users list:', userProfile.name);
+        }
+
+        // === STEP 3: Emergency Hardcoded Fallback (always works) ===
+        if (!userProfile) {
+            const emergency = this._emergencyAccounts.find(u =>
+                u.username === uname && u.password === upass
+            );
+            if (emergency) {
+                userProfile = {
+                    id: emergency.id,
+                    username: emergency.username,
+                    name: emergency.fullName,
+                    role: emergency.role,
+                    roleTitle: CONFIG.ROLE_NAMES_TH[emergency.role] || emergency.role,
+                    avatar: `https://api.dicebear.com/7.x/bottts/svg?seed=${emergency.role}_${emergency.username}`
+                };
+                console.log('[AuthManager] Matched in emergency accounts:', userProfile.name);
+            }
+        }
+
+        // === STEP 4: Student role lookup ===
+        if (!userProfile && (role === CONFIG.ROLES.STUDENT || role === 'student')) {
             const students = firebaseService.getStudents();
             const studentMatch = students.find(s =>
                 s.studentId === username || (s.fullName && s.fullName.includes(username))
@@ -94,72 +139,35 @@ class AuthManager {
                 roleTitle: CONFIG.ROLE_NAMES_TH.student,
                 avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=student'
             };
-        } else if (role === CONFIG.ROLES.ADMIN || role === 'admin') {
-            // Admin fallback (only when no users registered yet)
-            if (users.length === 0) {
-                userProfile = {
-                    id: 'ADM_01',
-                    username: username,
-                    name: username || 'ผู้ดูแลระบบ (Admin)',
-                    role: CONFIG.ROLES.ADMIN,
-                    roleTitle: CONFIG.ROLE_NAMES_TH.admin,
-                    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=admin'
-                };
-            }
-        } else if (role === 'head') {
-            // Head of student affairs - treated as teacher role
-            if (users.length === 0) {
-                userProfile = {
-                    id: 'HEAD_01',
-                    username: username,
-                    name: username || 'หัวหน้างานกิจการนักเรียน',
-                    role: CONFIG.ROLES.TEACHER,
-                    roleTitle: '🏫 หัวหน้างานกิจการนักเรียน',
-                    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=head'
-                };
-            }
-        } else {
-            // Teacher fallback (only when no users registered yet)
-            if (users.length === 0) {
-                userProfile = {
-                    id: 'TCH_01',
-                    username: username,
-                    name: username || 'ครูประจำชั้น / ครูกิจการนักเรียน',
-                    role: CONFIG.ROLES.TEACHER,
-                    roleTitle: CONFIG.ROLE_NAMES_TH.teacher,
-                    avatar: 'https://api.dicebear.com/7.x/bottts/svg?seed=teacher'
-                };
-            }
         }
 
+        // === STEP 5: Commit login ===
         if (userProfile) {
             this.currentUser = userProfile;
             localStorage.removeItem('prcare_user_logged_out');
-            // Store in BOTH storages for redundancy
             const userJson = JSON.stringify(userProfile);
             localStorage.setItem(CONFIG.STORAGE_KEYS.AUTH_USER, userJson);
             sessionStorage.setItem(CONFIG.STORAGE_KEYS.AUTH_USER, userJson);
             this.applyUIPermissions();
             window.dispatchEvent(new CustomEvent('authStateChanged', { detail: userProfile }));
-            console.log('[AuthManager] Login successful:', userProfile.name, '| Role:', userProfile.role);
+            console.log('[AuthManager] Login SUCCESS:', userProfile.name, '| Role:', userProfile.role);
             return true;
         }
 
-        console.warn('[AuthManager] Login failed - No matching user found for:', username, '| Role:', role);
+        console.warn('[AuthManager] Login FAILED for:', uname, '| Available users:', users.map(u => u.username));
         return false;
     }
 
     /**
-     * Logout - clears all auth state and shows login screen
+     * Logout - clears all state and shows login screen
      */
     logout() {
-        console.log('[AuthManager] Logging out user:', this.currentUser ? this.currentUser.name : 'unknown');
+        console.log('[AuthManager] Logging out:', this.currentUser ? this.currentUser.name : 'unknown');
         this.currentUser = null;
         localStorage.removeItem(CONFIG.STORAGE_KEYS.AUTH_USER);
         sessionStorage.removeItem(CONFIG.STORAGE_KEYS.AUTH_USER);
         localStorage.setItem('prcare_user_logged_out', 'true');
 
-        // Show login screen immediately
         const loginView = document.getElementById('login-screen-view');
         if (loginView) {
             loginView.style.display = 'flex';
@@ -168,8 +176,6 @@ class AuthManager {
             loginView.style.pointerEvents = 'auto';
             loginView.classList.remove('hidden');
         }
-
-        // Update header to show "not logged in"
         const userProfileNameEl = document.getElementById('user-profile-name');
         const userRoleBadgeEl = document.getElementById('user-role-badge');
         if (userProfileNameEl) userProfileNameEl.textContent = 'ยังไม่ได้เข้าสู่ระบบ';
@@ -178,17 +184,12 @@ class AuthManager {
         window.dispatchEvent(new CustomEvent('authStateChanged', { detail: null }));
     }
 
-    getCurrentUser() {
-        return this.currentUser;
-    }
-
-    isLoggedIn() {
-        return this.currentUser !== null;
-    }
+    getCurrentUser() { return this.currentUser; }
+    isLoggedIn() { return this.currentUser !== null; }
 
     hasRole(role) {
         if (!this.currentUser) return false;
-        if (this.currentUser.role === CONFIG.ROLES.ADMIN) return true; // Admin has all rights
+        if (this.currentUser.role === CONFIG.ROLES.ADMIN) return true;
         return this.currentUser.role === role;
     }
 
@@ -204,7 +205,6 @@ class AuthManager {
 
     /**
      * Apply UI Visibility Rules based on active user role
-     * Called after login, logout, and on init
      */
     applyUIPermissions() {
         const user = this.currentUser;
@@ -212,18 +212,16 @@ class AuthManager {
 
         document.body.setAttribute('data-user-role', role);
 
-        // Toggle Standalone Login View visibility
+        // Toggle login screen
         const loginScreenView = document.getElementById('login-screen-view');
         if (loginScreenView) {
             if (user) {
-                // Logged in: hide login screen
                 loginScreenView.style.display = 'none';
                 loginScreenView.style.opacity = '0';
                 loginScreenView.style.visibility = 'hidden';
                 loginScreenView.style.pointerEvents = 'none';
                 loginScreenView.classList.add('hidden');
             } else {
-                // Not logged in: show login screen
                 loginScreenView.style.display = 'flex';
                 loginScreenView.style.opacity = '1';
                 loginScreenView.style.visibility = 'visible';
@@ -232,7 +230,7 @@ class AuthManager {
             }
         }
 
-        // Update Top Navigation User Info
+        // Update header user info
         const userProfileNameEl = document.getElementById('user-profile-name');
         const userRoleBadgeEl = document.getElementById('user-role-badge');
         const userAvatarEl = document.getElementById('user-avatar');
@@ -241,7 +239,6 @@ class AuthManager {
             if (userProfileNameEl) userProfileNameEl.textContent = user.name;
             if (userRoleBadgeEl) userRoleBadgeEl.textContent = user.roleTitle || CONFIG.ROLE_NAMES_TH[user.role] || user.role;
             if (userAvatarEl && user.avatar) {
-                // Use img element for avatar
                 const img = document.createElement('img');
                 img.src = user.avatar;
                 img.alt = user.name;
@@ -259,11 +256,7 @@ class AuthManager {
         // Show/Hide Role-restricted Elements
         document.querySelectorAll('[data-require-role]').forEach(el => {
             const requiredRoles = el.getAttribute('data-require-role').split(',');
-            if (user && requiredRoles.includes(user.role)) {
-                el.style.display = '';
-            } else {
-                el.style.display = 'none';
-            }
+            el.style.display = (user && requiredRoles.includes(user.role)) ? '' : 'none';
         });
 
         // Hide Edit Buttons for Students

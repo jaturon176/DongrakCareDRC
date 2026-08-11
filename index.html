@@ -88,7 +88,7 @@
                         </div>
                     </div>
 
-                    <button type="submit" class="btn-signin-submit">
+                    <button type="button" class="btn-signin-submit" onclick="appLoginDirect(event)">
                         <i class="ri-key-2-line"></i> เข้าสู่ระบบ (Sign In)
                     </button>
                 </form>
@@ -1305,5 +1305,34 @@
             </div>
         </div>
     </div>
+    <script>
+        async function appLoginDirect(e) {
+            if (e) {
+                e.preventDefault();
+                e.stopPropagation();
+            }
+            const roleSelect = document.getElementById('page-login-role-select') || document.getElementById('page-login-role');
+            const userInput  = document.getElementById('page-login-user');
+            const passInput  = document.getElementById('page-login-pass');
+
+            const role = roleSelect ? roleSelect.value : 'teacher';
+            const username = userInput ? userInput.value.trim() : '';
+            const password = passInput ? passInput.value.trim() : '';
+
+            if (window.authManager) {
+                await window.authManager.login(role, username, password);
+            }
+
+            const loginScreen = document.getElementById('login-screen-view');
+            if (loginScreen) {
+                loginScreen.classList.add('hidden');
+                loginScreen.style.display = 'none';
+                loginScreen.style.opacity = '0';
+                loginScreen.style.visibility = 'hidden';
+                loginScreen.style.pointerEvents = 'none';
+            }
+            return false;
+        }
+    </script>
 </body>
 </html>

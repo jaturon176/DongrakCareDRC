@@ -4,7 +4,7 @@
  */
 
 const CONFIG = {
-    SYSTEM_VERSION: "8.7",
+    SYSTEM_VERSION: "8.8",
 
     // 1. Firebase Realtime Database Configuration
     FIREBASE: {
@@ -40,6 +40,7 @@ const CONFIG = {
         OFFENSES: "prcare_offenses_cache",
         REFERRALS: "prcare_referrals_cache",
         ACTIVITIES: "prcare_activities_cache",
+        USERS: "prcare_users_cache",
         AUTH_USER: "prcare_auth_user",
         LAST_SYNC: "prcare_last_sync_timestamp"
     },
